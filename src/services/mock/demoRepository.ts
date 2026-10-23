@@ -13,7 +13,21 @@ function initialState(): DemoState {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as DemoState;
-      if (Array.isArray(parsed.patients) && Array.isArray(parsed.appointments) && Array.isArray(parsed.invoices)) return parsed;
+      if (Array.isArray(parsed.patients) && Array.isArray(parsed.appointments) && Array.isArray(parsed.invoices)) {
+        parsed.appointments.forEach((a) => {
+          if (a.doctor === 'Dr. Nisha Kulkarni') a.doctor = 'Dr. Sangamitra';
+          if (a.doctor === 'Dr. Raghav Menon') a.doctor = 'Dr. Sundarprakash';
+        });
+        parsed.queue.forEach((q) => {
+          if (q.doctor === 'Dr. Nisha Kulkarni') q.doctor = 'Dr. Sangamitra';
+          if (q.doctor === 'Dr. Raghav Menon') q.doctor = 'Dr. Sundarprakash';
+        });
+        parsed.followUps?.forEach((f) => {
+          if (f.doctor === 'Dr. Nisha Kulkarni') f.doctor = 'Dr. Sangamitra';
+          if (f.doctor === 'Dr. Raghav Menon') f.doctor = 'Dr. Sundarprakash';
+        });
+        return parsed;
+      }
     }
   } catch {
     window.localStorage.removeItem(STORAGE_KEY);

@@ -6,7 +6,7 @@ import { paymentSchema } from '../../schemas/forms';
 import type { Invoice, Payment } from '../../types/domain';
 import { useHospitalData } from '../../services/mock/DemoProvider';
 import { useToast } from '../../components/ui/Toast';
-import { dateLabel, money, patientInvoiceTotals } from '../../utils/format';
+import { dateLabel, getAge, money, patientInvoiceTotals } from '../../utils/format';
 import { PageHeading, PatientAvatar } from '../../components/shared/Primitives';
 import { Badge, statusTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -71,13 +71,237 @@ function InvoiceModal({ invoice, onClose }: { invoice: Invoice | null; onClose: 
   </Modal>;
 }
 
-function InvoicePreview({ invoice, patient, totals, mode, latestPayment }: { invoice: Invoice; patient?: { fullName: string; id: string; phone: string; address: string }; totals: ReturnType<typeof patientInvoiceTotals>; mode: 'invoice' | 'receipt'; latestPayment?: Payment }) {
+function InvoicePreview({
+  invoice,
+  patient,
+  totals,
+  mode,
+  latestPayment,
+}: {
+  invoice: Invoice;
+  patient?: { fullName: string; id: string; phone: string; address: string; dateOfBirth?: string; gender?: string };
+  totals: ReturnType<typeof patientInvoiceTotals>;
+  mode: 'invoice' | 'receipt';
+  latestPayment?: Payment;
+}) {
   const receipt = mode === 'receipt';
-  return <article className={`invoice-paper printable${receipt ? ' receipt-print' : ''}`}>
-    <div className="invoice-header"><div className="invoice-brand"><span className="brand-mark"><img className="brand-logo" src="/northstar-mark.svg" alt="" /></span><div><h2>Northstar Medical</h2><p>Skin & Orthopaedics · Pune</p></div></div><div className="invoice-title"><span>{receipt ? 'Payment receipt' : 'Tax invoice · Demo'}</span><strong>{receipt ? `RCPT-${latestPayment?.id ?? 'DEMO'}` : invoice.id}</strong></div></div>
-    <div className="invoice-parties"><div><span>{receipt ? 'Received from' : 'Patient'}</span><strong>{patient?.fullName ?? 'Patient'}</strong><p>{patient?.id ?? invoice.patientId} · {patient?.phone ?? ''}</p><p>{patient?.address ?? ''}</p></div><div><span>{receipt ? 'Payment date' : 'Invoice date'}</span><strong>{dateLabel(receipt ? latestPayment?.paidAt ?? invoice.date : invoice.date)}</strong><p>{invoice.visitLabel}</p><p>{invoice.department === 'skin' ? 'Skin / Dermatology' : 'Orthopaedics'}</p></div></div>
-    {!receipt ? <table className="invoice-table"><thead><tr><th>Service</th><th>Qty</th><th>Amount</th></tr></thead><tbody><tr><td>Consultation fee</td><td>1</td><td>{money(invoice.consultationFee)}</td></tr>{invoice.charges.map((charge) => <tr key={charge.id}><td>{charge.description}<small> · Added by {charge.addedBy}</small></td><td>1</td><td>{money(charge.amount)}</td></tr>)}</tbody></table> : <div className="receipt-payment"><div><span>Amount received</span><strong>{money(latestPayment?.amount ?? 0)}</strong></div><div><span>Payment method</span><strong>{latestPayment?.method ?? '—'}</strong></div><div><span>Transaction reference</span><strong>{latestPayment?.transactionReference ?? 'Not provided'}</strong></div></div>}
-    {!receipt && <div className="invoice-totals"><div><span>Subtotal</span><strong>{money(totals.total)}</strong></div><div><span>Amount paid</span><strong>{money(totals.paid)}</strong></div><div className="grand"><span>Balance due</span><strong>{money(totals.balance)}</strong></div></div>}
-    <div className="invoice-footer">Demo invoice only · No payment was processed by a payment gateway.<br />Thank you for choosing Northstar Medical.</div>
-  </article>;
+  const doctorName = invoice.department === 'skin' ? 'Dr. Sangamitra' : 'Dr. Sundarprakash';
+  const departmentName = invoice.department === 'skin' ? 'Skin & Dermatology' : 'Orthopaedics & Joint Surgery';
+  const ageDisplay = patient?.dateOfBirth ? `${getAge(patient.dateOfBirth)} Yrs` : '';
+  const receiptNumber = latestPayment ? `RCPT-${latestPayment.id}` : `RCPT-${invoice.id.replace('INV-', '')}`;
+
+  return (
+    <article className={`invoice-paper printable${receipt ? ' receipt-print' : ''}`}>
+      {/* Hospital Official Letterhead */}
+      <div className="print-letterhead print-letterhead-invoice">
+        <div className="print-letterhead-top">
+          <div className="print-letterhead-brand">
+            <img src="/tosh-icon-circle.png" alt="TOSH Foundation Logo" className="print-letterhead-logo" />
+            <div className="print-letterhead-info">
+              <h1 className="print-letterhead-title">TOSH FOUNDATION</h1>
+              <p className="print-letterhead-tagline">Multispeciality Hospital & Care Institute</p>
+              <p className="print-letterhead-dept">Central Billing & Accounts Section · Pune</p>
+            </div>
+          </div>
+
+          <div className="print-letterhead-contacts">
+            <div>Plot 14, Senapati Bapat Road, Pune - 411016</div>
+            <div>GSTIN: 27AABCT8921P1Z5 · PAN: AAACT8921P</div>
+            <div>Phone: +91 20 6700 8000 · billing@toshfoundation.org</div>
+            <div className="print-letterhead-reg">Hosp. Reg. No: MAH/PUN/HOSP/2018/4891</div>
+          </div>
+        </div>
+
+        <div className="print-letterhead-bar">
+          <div className="print-doc-heading">
+            <h2>{receipt ? 'OFFICIAL PAYMENT RECEIPT' : 'OPD TAX INVOICE / HOSPITAL BILL'}</h2>
+            <span>{receipt ? 'Payment Acknowledgement Voucher' : 'Original for Recipient · Outpatient Care'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Invoice / Receipt Meta Grid */}
+      <div className="invoice-parties-box">
+        <div className="invoice-party-col">
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">Billed To (Patient Name):</span>
+            <strong className="invoice-meta-val">{patient?.fullName ?? 'Patient'}</strong>
+          </div>
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">UHID / Patient ID:</span>
+            <span className="invoice-meta-val">{patient?.id ?? invoice.patientId}</span>
+          </div>
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">Age / Gender:</span>
+            <span className="invoice-meta-val">
+              {ageDisplay} {patient?.gender ? `/ ${patient.gender}` : ''}
+            </span>
+          </div>
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">Contact / Phone:</span>
+            <span className="invoice-meta-val">{patient?.phone || '—'}</span>
+          </div>
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">Patient Address:</span>
+            <span className="invoice-meta-val">{patient?.address || 'Pune, Maharashtra'}</span>
+          </div>
+        </div>
+
+        <div className="invoice-party-col">
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">{receipt ? 'Receipt Voucher No:' : 'Invoice Number:'}</span>
+            <strong className="invoice-meta-val">{receipt ? receiptNumber : invoice.id}</strong>
+          </div>
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">{receipt ? 'Payment Date & Time:' : 'Invoice Date:'}</span>
+            <span className="invoice-meta-val">
+              {dateLabel(receipt ? (latestPayment?.paidAt ?? invoice.date) : invoice.date, 'd MMM yyyy, h:mm a')}
+            </span>
+          </div>
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">Department / Care Unit:</span>
+            <span className="invoice-meta-val">{departmentName}</span>
+          </div>
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">Consulting Clinician:</span>
+            <span className="invoice-meta-val">{doctorName}</span>
+          </div>
+          <div className="invoice-party-item">
+            <span className="invoice-meta-label">Episode / Visit Type:</span>
+            <span className="invoice-meta-val">{invoice.visitLabel || 'Outpatient Consultation'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tax Invoice Table */}
+      {!receipt ? (
+        <div className="invoice-table-wrapper">
+          <table className="invoice-table">
+            <thead>
+              <tr>
+                <th style={{ width: '5%', textAlign: 'center' }}>#</th>
+                <th style={{ width: '45%' }}>Service & Procedure Description</th>
+                <th style={{ width: '15%' }}>SAC Code</th>
+                <th style={{ width: '10%', textAlign: 'center' }}>Qty</th>
+                <th style={{ width: '12%', textAlign: 'right' }}>Rate (₹)</th>
+                <th style={{ width: '13%', textAlign: 'right' }}>Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ textAlign: 'center' }}>1</td>
+                <td>
+                  <strong>Specialist Consultation Fee</strong>
+                  <div className="invoice-item-sub">Consultant: {doctorName} ({departmentName})</div>
+                </td>
+                <td>999312</td>
+                <td style={{ textAlign: 'center' }}>1</td>
+                <td style={{ textAlign: 'right' }}>{money(invoice.consultationFee)}</td>
+                <td style={{ textAlign: 'right' }}><strong>{money(invoice.consultationFee)}</strong></td>
+              </tr>
+              {invoice.charges.map((charge, idx) => (
+                <tr key={charge.id}>
+                  <td style={{ textAlign: 'center' }}>{idx + 2}</td>
+                  <td>
+                    <strong>{charge.description}</strong>
+                    <div className="invoice-item-sub">Authorized by: {charge.addedBy}</div>
+                  </td>
+                  <td>999312</td>
+                  <td style={{ textAlign: 'center' }}>1</td>
+                  <td style={{ textAlign: 'right' }}>{money(charge.amount)}</td>
+                  <td style={{ textAlign: 'right' }}><strong>{money(charge.amount)}</strong></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Totals Summary */}
+          <div className="invoice-totals-wrapper">
+            <div className="invoice-totals-table">
+              <div className="invoice-total-row">
+                <span>Subtotal (Gross Charges)</span>
+                <strong>{money(totals.total)}</strong>
+              </div>
+              <div className="invoice-total-row">
+                <span>Healthcare Service Tax (GST 0%)</span>
+                <span>₹0.00 (Exempt)</span>
+              </div>
+              <div className="invoice-total-row">
+                <span>Total Invoice Value</span>
+                <strong>{money(totals.total)}</strong>
+              </div>
+              <div className="invoice-total-row print-highlight-row">
+                <span>Total Amount Paid</span>
+                <strong style={{ color: '#107E5B' }}>{money(totals.paid)}</strong>
+              </div>
+              <div className="invoice-total-row grand">
+                <span>Net Balance Due</span>
+                <strong style={{ color: totals.balance > 0 ? '#C0392B' : '#107E5B' }}>
+                  {money(totals.balance)}
+                </strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Payment Receipt View */
+        <div className="receipt-voucher-card">
+          <div className="receipt-voucher-header">
+            <h3>Payment Acknowledgement Details</h3>
+            <span className="receipt-voucher-status">TRANSACTION VERIFIED</span>
+          </div>
+
+          <div className="receipt-voucher-grid">
+            <div className="receipt-voucher-item">
+              <span>Receipt Number</span>
+              <strong>{receiptNumber}</strong>
+            </div>
+            <div className="receipt-voucher-item">
+              <span>Amount Received</span>
+              <strong className="receipt-amount-highlight">{money(latestPayment?.amount ?? totals.paid)}</strong>
+            </div>
+            <div className="receipt-voucher-item">
+              <span>Payment Mode</span>
+              <strong>{latestPayment?.method ?? 'Cash'}</strong>
+            </div>
+            <div className="receipt-voucher-item">
+              <span>Transaction Reference</span>
+              <span>{latestPayment?.transactionReference || 'Counter Cash Desk'}</span>
+            </div>
+            <div className="receipt-voucher-item">
+              <span>Payment Timestamp</span>
+              <span>{dateLabel(latestPayment?.paidAt ?? invoice.date, 'd MMM yyyy, h:mm a')}</span>
+            </div>
+            <div className="receipt-voucher-item">
+              <span>Remaining Balance</span>
+              <strong style={{ color: totals.balance > 0 ? '#C0392B' : '#107E5B' }}>
+                {money(totals.balance)}
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bill Footer & Signatory */}
+      <div className="invoice-print-footer">
+        <div className="invoice-terms-notes">
+          <strong>Statutory & Billing Notes:</strong>
+          <ol>
+            <li>Healthcare services provided by clinical establishments are exempt from GST under Notification No. 12/2017-Central Tax (Rate).</li>
+            <li>Fees once received are non-refundable. Please preserve this invoice/receipt for insurance and mediclaim reimbursement.</li>
+            <li>This is a computer-generated tax invoice/receipt issued by TOSH Foundation.</li>
+          </ol>
+        </div>
+
+        <div className="invoice-signatory-box">
+          <div className="invoice-signatory-space">
+            <div className="invoice-signatory-line" />
+          </div>
+          <strong>For TOSH Foundation</strong>
+          <span>Authorized Billing Officer / Cashier</span>
+          <small>Shivajinagar OPD Counter · Pune</small>
+        </div>
+      </div>
+    </article>
+  );
 }

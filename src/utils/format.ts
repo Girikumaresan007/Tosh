@@ -24,3 +24,52 @@ export const patientInvoiceTotals = (invoice: { consultationFee: number; charges
   const paid = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
   return { total, paid, balance: Math.max(0, total - paid), status: paid >= total ? 'Paid' as const : paid > 0 ? 'Partial' as const : 'Due' as const };
 };
+
+/**
+ * Compares an ISO date string or Date with a YYYY-MM-DD string
+ */
+export const isSameISODate = (isoString?: string | null, targetYMD?: string | null): boolean => {
+  if (!isoString || !targetYMD) return false;
+  try {
+    const date = typeof isoString === 'string' ? parseISO(isoString) : isoString;
+    if (!isValid(date)) return false;
+    const ymd = format(date, 'yyyy-MM-dd');
+    return ymd === targetYMD;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Checks whether an ISO date string matches a search query like "oct 11", "11 oct", "october 11", "2026-10-11", "11/10"
+ */
+export const matchesDateSearch = (isoString?: string | null, query?: string | null): boolean => {
+  if (!isoString || !query) return false;
+  const q = query.trim().toLowerCase();
+  if (!q) return false;
+  try {
+    const date = typeof isoString === 'string' ? parseISO(isoString) : isoString;
+    if (!isValid(date)) return false;
+
+    const variations = [
+      format(date, 'yyyy-MM-dd'),
+      format(date, 'd MMM yyyy').toLowerCase(),
+      format(date, 'd MMMM yyyy').toLowerCase(),
+      format(date, 'd MMM').toLowerCase(),
+      format(date, 'MMM d').toLowerCase(),
+      format(date, 'd MMMM').toLowerCase(),
+      format(date, 'MMMM d').toLowerCase(),
+      format(date, 'dd/MM/yyyy'),
+      format(date, 'dd-MM-yyyy'),
+      format(date, 'd/M/yyyy'),
+      format(date, 'd-M-yyyy'),
+      format(date, 'MMMM').toLowerCase(),
+      format(date, 'MMM').toLowerCase(),
+    ];
+
+    return variations.some((v) => v.includes(q) || q.includes(v));
+  } catch {
+    return false;
+  }
+};
+

@@ -6,7 +6,24 @@ export function PageHeading({ eyebrow, title, description, actions }: { eyebrow?
 }
 
 export function PatientAvatar({ name, tone = 'teal', small = false }: { name: string; tone?: 'teal' | 'blue' | 'peach'; small?: boolean }) {
-  return <span className={`avatar${small ? ' small' : ''} ${tone}`}>{initials(name)}</span>;
+  return (
+    <span
+      className={`avatar${small ? ' small' : ''} ${tone}`}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        lineHeight: 1,
+        flexShrink: 0,
+        margin: 0,
+        padding: 0,
+        boxSizing: 'border-box',
+      }}
+    >
+      {initials(name)}
+    </span>
+  );
 }
 
 export function PatientCell({ name, id, tone = 'teal' }: { name: string; id: string; tone?: 'teal' | 'blue' | 'peach' }) {

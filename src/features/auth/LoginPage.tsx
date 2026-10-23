@@ -18,7 +18,7 @@ export function LoginPage() {
   };
   return <div className="login-page">
     <main className="login-panel">
-      <div className="login-brand"><span className="brand-mark"><img className="brand-logo" src="/northstar-mark.svg" alt="" /></span><div><strong>Northstar Medical</strong><span>Care operations · Demo workspace</span></div></div>
+      <div className="login-brand"><span className="brand-mark"><img className="brand-logo" src="/tosh-icon-circle.png" alt="TOSH Foundation" /></span><div><strong>TOSH Foundation</strong><span>Care operations · Demo workspace</span></div></div>
       <div className="eyebrow">Skin & Orthopaedics</div>
       <h1>Care, clearly<br />in motion.</h1>
       <p>A connected workspace for the people who welcome, assess and support every patient visit.</p>

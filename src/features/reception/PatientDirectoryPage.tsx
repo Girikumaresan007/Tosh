@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { FileText, Search, UserRound, Wallet } from 'lucide-react';
+import { CalendarDays, FileText, Search, UserRound, Wallet, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import type { Patient } from '../../types/domain';
 import { useHospitalData } from '../../services/mock/DemoProvider';
-import { dateLabel, departmentLabel, money, patientInvoiceTotals } from '../../utils/format';
+import { dateLabel, departmentLabel, isSameISODate, matchesDateSearch, money, patientInvoiceTotals } from '../../utils/format';
 import { useToast } from '../../components/ui/Toast';
 import { PageHeading, PatientAvatar } from '../../components/shared/Primitives';
 import { Badge, statusTone } from '../../components/ui/Badge';
@@ -21,20 +21,105 @@ export function PatientDirectoryPage() {
   const { state } = useHospitalData();
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState(params.get('q') ?? '');
+  const [selectedDate, setSelectedDate] = useState('');
   const [department, setDepartment] = useState('all');
   const [page, setPage] = useState(1);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   useEffect(() => { setQuery(params.get('q') ?? ''); }, [params]);
+
   const matches = useMemo(() => state.patients.filter((patient) => {
-    const text = `${patient.fullName} ${patient.id} ${patient.phone} ${patient.email ?? ''}`.toLowerCase();
-    return text.includes(query.toLowerCase()) && (department === 'all' || patient.departments.includes(department as 'skin' | 'orthopaedics'));
-  }).sort((a, b) => a.fullName.localeCompare(b.fullName)), [department, query, state.patients]);
+    const q = query.trim().toLowerCase();
+    const deptMatch = (department === 'all' || patient.departments.includes(department as 'skin' | 'orthopaedics'));
+    if (!deptMatch) return false;
+
+    // Filter by date picker
+    if (selectedDate) {
+      const hasConsultation = state.consultations.some(c => c.patientId === patient.id && isSameISODate(c.visitedAt, selectedDate));
+      const hasAppointment = state.appointments.some(a => a.patientId === patient.id && isSameISODate(a.startsAt, selectedDate));
+      const hasLatestVisit = isSameISODate(patient.latestVisitAt, selectedDate);
+      const hasRegistered = isSameISODate(patient.registeredAt, selectedDate);
+      if (!hasConsultation && !hasAppointment && !hasLatestVisit && !hasRegistered) {
+        return false;
+      }
+    }
+
+    // Filter by query (text or date string like 'Oct 11')
+    if (q) {
+      const text = `${patient.fullName} ${patient.id} ${patient.phone} ${patient.email ?? ''}`.toLowerCase();
+      const textMatch = text.includes(q);
+      const dateMatch =
+        matchesDateSearch(patient.latestVisitAt, q) ||
+        matchesDateSearch(patient.registeredAt, q) ||
+        state.consultations.some(c => c.patientId === patient.id && matchesDateSearch(c.visitedAt, q)) ||
+        state.appointments.some(a => a.patientId === patient.id && matchesDateSearch(a.startsAt, q));
+
+      if (!textMatch && !dateMatch) return false;
+    }
+
+    return true;
+  }).sort((a, b) => a.fullName.localeCompare(b.fullName)), [department, query, selectedDate, state.appointments, state.consultations, state.patients]);
+
   const pages = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
   const visible = matches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const setSearch = (value: string) => { setPage(1); setQuery(value); setParams(value ? { q: value } : {}); };
+
   return <>
     <PageHeading eyebrow="Reception · Records" title="All patients" description="Fictional demo records with visit history, appointments, invoices and follow-ups." actions={<Badge tone="info">{state.patients.length} demo records</Badge>} />
-    <Card padded={false}><div style={{ padding: '18px 20px 0' }}><div className="toolbar"><div className="search-field"><Search size={15} /><input aria-label="Search patients" placeholder="Name, patient ID, phone or email" value={query} onChange={(event) => setSearch(event.target.value)} /></div><select aria-label="Filter patients by department" className="select-field" value={department} onChange={(event) => { setDepartment(event.target.value); setPage(1); }}><option value="all">All departments</option><option value="skin">Skin</option><option value="orthopaedics">Orthopaedics</option></select><span className="result-count">{matches.length} records</span></div></div>
+    <Card padded={false}>
+      <div style={{ padding: '18px 20px 0' }}>
+        <div className="toolbar">
+          <div className="search-field">
+            <Search size={15} />
+            <input aria-label="Search patients" placeholder="Name, patient ID, phone, or date (e.g. 'Oct 11')..." value={query} onChange={(event) => setSearch(event.target.value)} />
+            {query && (
+              <button
+                type="button"
+                className="icon-button"
+                style={{ width: 22, height: 22, border: 0 }}
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          <label className="date-control" title="Filter patients with visits or appointments on a specific date">
+            <CalendarDays size={15} color="var(--teal)" />
+            <span className="sr-only">Filter by date</span>
+            <input
+              aria-label="Filter patients by visit or appointment date"
+              type="date"
+              value={selectedDate}
+              onChange={(event) => {
+                setSelectedDate(event.target.value);
+                setPage(1);
+              }}
+            />
+          </label>
+
+          <select aria-label="Filter patients by department" className="select-field" value={department} onChange={(event) => { setDepartment(event.target.value); setPage(1); }}>
+            <option value="all">All departments</option>
+            <option value="skin">Skin</option>
+            <option value="orthopaedics">Orthopaedics</option>
+          </select>
+
+          {selectedDate && (
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={() => {
+                setSelectedDate('');
+                setPage(1);
+              }}
+            >
+              Clear date
+            </Button>
+          )}
+
+          <span className="result-count">{matches.length} records</span>
+        </div>
+      </div>
       {matches.length ? <><div className="table-wrap responsive-cards"><table className="data-table"><thead><tr><th>Patient</th><th>Phone</th><th>Departments</th><th>Latest visit</th><th>Registered</th><th /></tr></thead><tbody>{visible.map((patient) => <tr key={patient.id}><td><button className="patient-link" type="button" onClick={() => setSelectedPatient(patient)}><span className="patient-cell"><PatientAvatar name={patient.fullName} small /><span><strong>{patient.fullName}</strong><span>{patient.id}</span></span></span></button></td><td>{patient.phone}</td><td><div className="department-tags">{patient.departments.map((dept) => <Badge key={dept} tone="info">{dept === 'skin' ? 'Skin' : 'Orthopaedics'}</Badge>)}</div></td><td>{patient.latestVisitAt ? dateLabel(patient.latestVisitAt) : 'No visit yet'}</td><td>{dateLabel(patient.registeredAt)}</td><td><Button variant="ghost" size="small" onClick={() => setSelectedPatient(patient)}>View profile</Button></td></tr>)}</tbody></table></div>
         <div className="patient-card-list directory-card-list">{visible.map((patient) => <article className="patient-card" key={patient.id}><div className="patient-card-head"><div className="patient-card-name"><PatientAvatar name={patient.fullName} /><div><strong>{patient.fullName}</strong><span>{patient.id}</span></div></div><Button variant="ghost" size="small" onClick={() => setSelectedPatient(patient)}>Details</Button></div><div className="patient-card-meta"><div><small>Phone</small><strong>{patient.phone}</strong></div><div><small>Latest visit</small><strong>{patient.latestVisitAt ? dateLabel(patient.latestVisitAt) : 'No visit yet'}</strong></div></div><div className="department-tags" style={{ marginTop: 12 }}>{patient.departments.map((dept) => <Badge key={dept} tone="info">{dept === 'skin' ? 'Skin' : 'Orthopaedics'}</Badge>)}</div></article>)}</div>
         <div className="table-footer" style={{ padding: '14px 20px 18px' }}><span>Showing {matches.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, matches.length)} of {matches.length}</span><div className="button-row"><Button variant="secondary" size="small" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button><span>Page {page} of {pages}</span><Button variant="secondary" size="small" disabled={page >= pages} onClick={() => setPage((current) => Math.min(pages, current + 1))}>Next</Button></div></div>

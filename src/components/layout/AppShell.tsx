@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Bell, Bone, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, CreditCard, FileBarChart2, FileText, History, LayoutDashboard, LogOut, Menu, MessageCircle, Search, Settings, Stethoscope, UserRound, Users, X } from 'lucide-react';
+import { Bell, Bone, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, CreditCard, FileBarChart2, History, LayoutDashboard, LogOut, Menu, MessageCircle, Search, Settings, Stethoscope, UserRound, Users, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { PortalRole } from '../../types/domain';
 import { useHospitalData } from '../../services/mock/DemoProvider';
@@ -22,8 +22,7 @@ const navByRole: Record<PortalRole, NavItem[]> = {
     { label: 'Appointments', to: '/skin/appointments', icon: CalendarDays },
     { label: 'Patients', to: '/skin/patients', icon: Users },
     { label: 'Consultation', to: '/skin/consultation', icon: Stethoscope },
-    { label: 'Prescriptions', to: '/skin/prescriptions', icon: FileText },
-    { label: 'Treatments / Procedures', to: '/skin/treatments', icon: Activity },
+    { label: 'Charges', to: '/skin/charges', icon: CreditCard },
     { label: 'Follow-ups', to: '/skin/follow-ups', icon: MessageCircle },
     { label: 'Visit History', to: '/skin/history', icon: History },
   ],
@@ -33,16 +32,15 @@ const navByRole: Record<PortalRole, NavItem[]> = {
     { label: 'Patients', to: '/ortho/patients', icon: Users },
     { label: 'Consultation', to: '/ortho/consultation', icon: Stethoscope },
     { label: 'Body Region Templates', to: '/ortho/templates', icon: Bone },
-    { label: 'Prescriptions', to: '/ortho/prescriptions', icon: FileText },
-    { label: 'Treatments / Procedures', to: '/ortho/treatments', icon: Activity },
+    { label: 'Charges', to: '/ortho/charges', icon: CreditCard },
     { label: 'Follow-ups', to: '/ortho/follow-ups', icon: MessageCircle },
     { label: 'Visit History', to: '/ortho/history', icon: History },
   ],
 };
 const roleInfo: Record<PortalRole, { label: string; identity: string; name: string }> = {
   reception: { label: 'Reception', identity: 'Front desk · Patient services', name: 'Priya Sharma' },
-  skin: { label: 'Skin & Dermatology', identity: 'Skin department', name: 'Dr. Nisha Kulkarni' },
-  orthopaedics: { label: 'Orthopaedics', identity: 'Orthopaedic department', name: 'Dr. Raghav Menon' },
+  skin: { label: 'Skin & Dermatology', identity: 'Skin department', name: 'Dr. Sangamitra' },
+  orthopaedics: { label: 'Orthopaedics', identity: 'Orthopaedic department', name: 'Dr. Sundarprakash' },
 };
 const routeBase: Record<PortalRole, string> = { reception: '/reception', skin: '/skin', orthopaedics: '/ortho' };
 
@@ -55,19 +53,43 @@ function roleFromPath(path: string): PortalRole {
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { mode } = useHospitalData();
+  const { mode, state } = useHospitalData();
   const role = roleFromPath(location.pathname);
   const info = roleInfo[role];
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
   const links = navByRole[role];
   const title = useMemo(() => links.find((item) => location.pathname === item.to || (item.to.endsWith('/consultation') && location.pathname.startsWith(`${item.to}/`)))?.label ?? info.label, [info.label, links, location.pathname]);
-  useEffect(() => { setMobileOpen(false); setShowAlerts(false); }, [location.pathname]);
+
+  // Keep query in sync if URL contains q on patients page
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const q = searchParams.get('q');
+    if (q !== null && location.pathname.includes('/patients')) {
+      setQuery(q);
+    }
+  }, [location.pathname, location.search]);
+
+  useEffect(() => { setMobileOpen(false); setShowAlerts(false); setSearchFocused(false); }, [location.pathname]);
+
+  // Handle outside click to close search popup
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
   useEffect(() => {
     if (!mobileOpen) return;
     const prior = document.activeElement as HTMLElement | null;
@@ -87,20 +109,47 @@ export function AppShell() {
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; if (prior && document.contains(prior)) prior.focus(); };
   }, [mobileOpen]);
 
+  const departmentMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const dept = role === 'reception' ? null : (role === 'skin' ? 'skin' : 'orthopaedics');
+    return state.patients
+      .filter((p) => {
+        const matchesDept = !dept || p.departments.includes(dept);
+        const matchesQuery = `${p.fullName} ${p.id} ${p.phone} ${p.email ?? ''}`.toLowerCase().includes(q);
+        return matchesDept && matchesQuery;
+      })
+      .slice(0, 5);
+  }, [query, role, state.patients]);
+
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!query.trim()) return;
+    setSearchFocused(false);
+    if (!query.trim()) {
+      navigate(`${routeBase[role]}/patients`);
+      return;
+    }
     navigate(`${routeBase[role]}/patients?q=${encodeURIComponent(query.trim())}`);
   };
+
+  const handleSelectPatient = (patientId: string) => {
+    setSearchFocused(false);
+    if (role === 'reception') {
+      navigate(`/reception/patients?q=${encodeURIComponent(patientId)}`);
+    } else {
+      navigate(`/${role}/consultation/${patientId}`);
+    }
+  };
+
   const signOut = () => { sessionStorage.removeItem('carehub-demo-role'); navigate('/'); };
 
   return <div className={`app-shell${collapsed ? ' is-sidebar-collapsed' : ''}`}>
     <div className={`mobile-scrim${mobileOpen ? ' visible' : ''}`} onClick={() => setMobileOpen(false)} aria-hidden="true" />
     <aside ref={sidebarRef} id="primary-navigation" className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`} role={mobileOpen ? 'dialog' : undefined} aria-modal={mobileOpen || undefined} aria-label={`${info.label} navigation`}>
-      <div className="sidebar-brand"><span className="brand-mark"><img className="brand-logo" src="/northstar-mark.svg" alt="" /></span><div className="brand-copy"><div className="brand-text">Northstar Medical</div><div className="brand-subtext">Care operations</div></div></div>
+      <div className="sidebar-brand"><span className="brand-mark"><img className="brand-logo" src="/tosh-icon-circle.png" alt="TOSH Foundation" /></span><div className="brand-copy"><div className="brand-text">TOSH Foundation</div><div className="brand-subtext">Care operations</div></div></div>
       <div className="sidebar-photo" aria-hidden="true">
         {!photoFailed && <img src="/images/clinic-sidebar.jpeg" alt="" onError={() => setPhotoFailed(true)} />}
-        <div className="sidebar-photo-copy"><span>{role === 'reception' ? 'Today at Northstar' : 'Department workspace'}</span><strong>{role === 'reception' ? 'Care, connected.' : info.label}</strong></div>
+        <div className="sidebar-photo-copy"><span>{role === 'reception' ? 'Today at TOSH Foundation' : 'Department workspace'}</span><strong>{role === 'reception' ? 'Care, connected.' : info.label}</strong></div>
       </div>
       <nav className="sidebar-nav" aria-label="Main menu"><div className="nav-section-label">Workspace</div>{links.map((item) => {
         const Icon = item.icon;
@@ -116,7 +165,67 @@ export function AppShell() {
           <button ref={mobileMenuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'} aria-controls="primary-navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen((value) => !value)}>{mobileOpen ? <X size={19} /> : <Menu size={19} />}</button>
           <button className="icon-button desktop-collapse" type="button" aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}</button>
           <div><div className="topbar-title">{title}</div><div className="topbar-date">{new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date())} · {info.label}</div></div>
-          <form className="topbar-search" role="search" onSubmit={submitSearch}><Search size={15} /><input aria-label="Search patients" placeholder="Find a patient" value={query} onChange={(event) => setQuery(event.target.value)} /></form>
+          
+          <div className="topbar-search-container" ref={searchContainerRef}>
+            <form className="topbar-search" role="search" onSubmit={submitSearch}>
+              <Search size={15} />
+              <input
+                aria-label="Search patients"
+                placeholder="Find a patient"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onFocus={() => setSearchFocused(true)}
+              />
+              {query && (
+                <button
+                  type="button"
+                  style={{ background: 'transparent', border: 0, padding: 2, cursor: 'pointer', color: '#94A3B8' }}
+                  onClick={() => { setQuery(''); navigate(`${routeBase[role]}/patients`); }}
+                  aria-label="Clear patient search"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </form>
+
+            {searchFocused && query.trim().length > 0 && (
+              <div className="topbar-search-dropdown" role="listbox">
+                <div className="topbar-search-dropdown-header">
+                  <span>Matching {role === 'skin' ? 'Skin' : role === 'orthopaedics' ? 'Ortho' : ''} Patients ({departmentMatches.length})</span>
+                </div>
+                {departmentMatches.length > 0 ? (
+                  departmentMatches.map((pat) => (
+                    <button
+                      key={pat.id}
+                      type="button"
+                      className="topbar-search-result-item"
+                      onClick={() => handleSelectPatient(pat.id)}
+                    >
+                      <div className="topbar-search-result-avatar">
+                        {pat.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                      </div>
+                      <div className="topbar-search-result-info">
+                        <strong>{pat.fullName}</strong>
+                        <span>{pat.id} · {pat.gender} · {pat.phone}</span>
+                      </div>
+                      <span className="topbar-search-result-action">
+                        {role === 'reception' ? 'View' : 'Consult'}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="topbar-search-empty">
+                    No patients found matching "{query}"
+                  </div>
+                )}
+                <div className="topbar-search-dropdown-footer">
+                  <button type="button" onClick={submitSearch} className="topbar-search-all-link">
+                    Press Enter to view all results in Patients directory &rarr;
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="topbar-actions">
           <div className="portal-select-wrap"><label className="sr-only" htmlFor="portal-switch">Switch portal</label><select id="portal-switch" className="select-field portal-switcher" value={role} onChange={(event) => navigate(`${routeBase[event.target.value as PortalRole]}/dashboard`)}><option value="reception">Reception</option><option value="skin">Skin Doctor</option><option value="orthopaedics">Orthopaedic Doctor</option></select></div>

@@ -106,6 +106,15 @@ export interface PrescriptionItem {
   instructions: string;
 }
 
+export interface PrescriptionImage {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+  dataUrl: string;
+}
+
 export interface PatientDocument {
   id: string;
   patientId: string;
@@ -141,6 +150,7 @@ export interface Consultation {
   diagnosis: string;
   treatmentPlan: string;
   prescription: PrescriptionItem[];
+  prescriptionImages?: PrescriptionImage[];
   documents: PatientDocument[];
   procedures: ChargeItem[];
   followUpDate?: string;

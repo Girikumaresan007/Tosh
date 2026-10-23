@@ -20,7 +20,7 @@ export function DoctorDashboard({ department }: { department: Department }) {
   const completed = queue.filter((item) => item.status === 'Completed').length;
   const due = state.followUps.filter((item) => item.department === department && item.status === 'Upcoming' && new Date(`${item.date}T00:00:00`) <= addDays(today, 2)).length;
   const deptTitle = department === 'skin' ? 'Skin & Dermatology' : 'Orthopaedics';
-  const doctorName = department === 'skin' ? 'Dr. Nisha Kulkarni' : 'Dr. Raghav Menon';
+  const doctorName = department === 'skin' ? 'Dr. Sangamitra' : 'Dr. Sundarprakash';
   const rows = [...appointments].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const cards = [
     { label: "Today's appointments", value: appointments.length, hint: 'Booked for today', icon: <CalendarDays size={16} /> },

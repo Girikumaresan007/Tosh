@@ -16,7 +16,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Field, TextAreaField } from '../../components/ui/Field';
 import { Modal } from '../../components/ui/Modal';
 
-const doctors: Record<Department, string[]> = { skin: ['Dr. Nisha Kulkarni'], orthopaedics: ['Dr. Raghav Menon'] };
+const doctors: Record<Department, string[]> = { skin: ['Dr. Sangamitra'], orthopaedics: ['Dr. Sundarprakash'] };
 const blankPatient = { fullName: '', dateOfBirth: '', gender: 'Prefer not to say' as Gender, phone: '', email: '', address: '', emergencyContact: '' };
 const startAppointment = { patientId: '', department: 'skin' as Department, doctor: doctors.skin[0], startsAt: localDateTimeInput(addDays(new Date(), 1)), visitType: 'New' as VisitType, note: '' };
 

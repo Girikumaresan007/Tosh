@@ -18,13 +18,14 @@ import { DocumentsPanel } from './clinical/DocumentsPanel';
 import { ProceduresPanel } from './clinical/ProceduresPanel';
 import { DoctorFollowUpPanel } from './clinical/DoctorFollowUpPanel';
 import { BodyRegionTemplatesPanel } from './clinical/BodyRegionTemplatesPanel';
+import { PrintLetterhead, PrintPatientMeta, PrintVitalsPanel, PrintRxTable, PrintDoctorSignatureBlock } from '../../components/shared/PrintTemplates';
 
 const tabs = ['Clinical notes', 'Prescription', 'Documents', 'Procedures', 'Follow-up'] as const;
 type Tab = typeof tabs[number];
 const tabOptions = tabs.map((label) => ({ id: label, label }));
-const doctorNames: Record<Department, string> = { skin: 'Dr. Nisha Kulkarni', orthopaedics: 'Dr. Raghav Menon' };
+const doctorNames: Record<Department, string> = { skin: 'Dr. Sangamitra', orthopaedics: 'Dr. Sundarprakash' };
 function blankVisit(patientId: string, department: Department, visitId?: string): Consultation {
-  return { id: visitId ?? `DRAFT-${patientId}-${department}`, patientId, department, visitedAt: new Date().toISOString(), vitals: { bloodPressure: '', pulse: '', temperature: '', height: '', weight: '', oxygenSaturation: '' }, symptoms: '', medicalHistory: '', allergies: '', examination: '', assessment: '', diagnosis: '', treatmentPlan: '', prescription: [], documents: [], procedures: [], painLocation: '', side: 'Not applicable', status: 'Draft' };
+  return { id: visitId ?? `DRAFT-${patientId}-${department}`, patientId, department, visitedAt: new Date().toISOString(), vitals: { bloodPressure: '', pulse: '', temperature: '', height: '', weight: '', oxygenSaturation: '' }, symptoms: '', medicalHistory: '', allergies: '', examination: '', assessment: '', diagnosis: '', treatmentPlan: '', prescription: [], prescriptionImages: [], documents: [], procedures: [], painLocation: '', side: 'Not applicable', status: 'Draft' };
 }
 
 export function ClinicalWorkspace({ department }: { department: Department }) {
@@ -75,14 +76,21 @@ export function ClinicalWorkspace({ department }: { department: Department }) {
         <Card><SectionHeading title="Patient overview" action={<span className="clinical-summary-tag"><FileText size={14} /><Badge tone={clinical.status === 'Finalized' ? 'success' : 'warn'}>{clinical.status}</Badge></span>} /><div className="clinical-patient-name"><PatientAvatar name={patient.fullName} /><div><strong>{patient.fullName}</strong><span>{patient.id}</span></div></div><div className="profile-grid compact-profile"><div className="profile-info"><span>Age / gender</span><strong>{getAge(patient.dateOfBirth) ?? '—'} years · {patient.gender}</strong></div><div className="profile-info"><span>Phone</span><strong>{patient.phone}</strong></div><div className="profile-info"><span>Department</span><strong>{departmentLabel(department)}</strong></div><div className="profile-info"><span>Latest visit</span><strong>{patient.latestVisitAt ? formatDistanceToNow(new Date(patient.latestVisitAt), { addSuffix: true }) : 'First visit'}</strong></div></div><div className="field" style={{ marginTop: 13 }}><label htmlFor="consult-patient">Switch patient</label><select id="consult-patient" className="control" value={patient.id} onChange={(event) => changePatient(event.target.value)}>{patients.map((entry) => <option key={entry.id} value={entry.id}>{entry.fullName} · {entry.id}</option>)}</select></div></Card>
         <Card><SectionHeading title="Reception-entered vitals" subtitle="Review or edit demo measurements in Clinical notes." /><div className="vitals-grid">{[['BP', clinical.vitals.bloodPressure], ['Pulse', clinical.vitals.pulse], ['Temp', clinical.vitals.temperature], ['Height', clinical.vitals.height], ['Weight', clinical.vitals.weight], ['SpO₂', clinical.vitals.oxygenSaturation]].map(([label, value]) => <div className="vital-tile" key={label}><span>{label}</span><strong>{value || '—'}</strong></div>)}</div></Card>
         <Card><SectionHeading title="Visit context" /><div className="metric-list"><div className="metric-line"><span>Allergies</span><strong>{clinical.allergies || 'Not recorded'}</strong></div><div className="metric-line"><span>Next appointment</span><strong>{nextAppointment ? dateLabel(nextAppointment.startsAt, 'd MMM · h:mm a') : 'None scheduled'}</strong></div><div className="metric-line"><span>Follow-up</span><strong>{clinical.followUpDate ? dateLabel(`${clinical.followUpDate}T00:00:00`) : 'Not set'}</strong></div></div></Card>
-        {department === 'orthopaedics' && <BodyRegionTemplatesPanel consultation={clinical} onChange={patch} />}
+        {department === 'orthopaedics' && (
+          <BodyRegionTemplatesPanel
+            consultation={clinical}
+            onChange={patch}
+            onPrintPrescription={() => print('prescription')}
+            onSelectTab={(tabName) => setTab(tabName as any)}
+          />
+        )}
       </aside>
       <section className="clinical-main">
         <Tabs idPrefix="clinical" ariaLabel="Consultation sections" items={tabOptions} selected={tab} onChange={setTab} className="clinical-tabs" />
         {dirty && <div className="status-strip" role="status"><ClipboardList size={14} /> You have unsaved changes. Save draft to keep them in the shared demo record.</div>}
         <TabPanel idPrefix="clinical" selected={tab} className="clinical-tab-content">
           {tab === 'Clinical notes' && <ClinicalNotesPanel department={department} consultation={clinical} onChange={patch} />}
-          {tab === 'Prescription' && <PrescriptionPanel consultation={clinical} onChange={patch} onPrint={() => print('prescription')} />}
+          {tab === 'Prescription' && <PrescriptionPanel consultation={clinical} onChange={patch} onPrint={() => print('prescription')} department={department} />}
           {tab === 'Documents' && <DocumentsPanel patientId={patient.id} department={department} documents={clinical.documents} onChange={(documents) => patch({ documents })} />}
           {tab === 'Procedures' && <ProceduresPanel patientId={patient.id} department={department} consultation={clinical} onChange={patch} />}
           {tab === 'Follow-up' && <DoctorFollowUpPanel patientId={patient.id} department={department} doctor={doctorNames[department]} consultation={clinical} onChange={patch} />}
@@ -90,10 +98,145 @@ export function ClinicalWorkspace({ department }: { department: Department }) {
         <div className="clinical-bottom-actions"><span className="field-hint">Saved in frontend demo state only · not a real medical record.</span><div className="button-row"><Button variant="secondary" onClick={() => save('Draft')} icon={<Save size={14} />}>Save draft</Button><Button onClick={() => save('Finalized')} icon={<CheckCheck size={14} />}>Save as finalized</Button></div></div>
       </section>
     </div>
-    <section className="print-sheet clinical-print-sheet" aria-label="Printable consultation summary"><PrintHeader department={department} /><h1>Consultation summary</h1><p>{patient.fullName} · {patient.id} · {dateLabel(clinical.visitedAt)}</p><PrintBlock title="Vitals" content={Object.entries(clinical.vitals).map(([key, value]) => `${key}: ${value || '—'}`).join(' · ')} /><PrintBlock title="Symptoms" content={clinical.symptoms} /><PrintBlock title="Medical history" content={clinical.medicalHistory} /><PrintBlock title="Allergies" content={clinical.allergies} /><PrintBlock title="Examination" content={clinical.examination} /><PrintBlock title="Assessment" content={clinical.assessment} /><PrintBlock title="Diagnosis" content={clinical.diagnosis} /><PrintBlock title="Treatment plan" content={clinical.treatmentPlan} />{department === 'orthopaedics' && <PrintBlock title="Body region" content={`${clinical.painLocation || 'Not recorded'} · ${clinical.side || 'Not specified'}`} />}{clinical.prescription.map((item) => <PrintBlock key={item.id} title={item.medicineName} content={`${item.strength} · ${item.dosage} · ${item.route} · ${item.frequency} · ${item.duration}${item.instructions ? ` · ${item.instructions}` : ''}`} />)}<div className="print-signature">Clinician: {doctorNames[department]}<span>Doctor-entered demo record</span></div></section>
-    <section className="print-sheet prescription-print-sheet" aria-label="Printable prescription"><PrintHeader department={department} /><h1>Prescription</h1><p>{patient.fullName} · {patient.id} · {dateLabel(clinical.visitedAt)}</p>{clinical.diagnosis && <PrintBlock title="Diagnosis" content={clinical.diagnosis} />}{clinical.prescription.length ? clinical.prescription.map((item) => <div className="print-prescription-row" key={item.id}><h3>{item.medicineName}</h3><p>{item.strength} · {item.dosage} · {item.route}</p><p>{item.frequency} · {item.duration}</p>{item.instructions && <p>{item.instructions}</p>}</div>) : <p>No medication entered by clinician.</p>}<div className="print-signature">Clinician: {doctorNames[department]}<span>Only details entered and approved by the clinician are included.</span></div></section>
+    {/* Printable Consultation Summary Sheet */}
+    <section className="print-sheet clinical-print-sheet" aria-label="Printable consultation summary">
+      <PrintLetterhead
+        department={department}
+        documentTitle="OUTPATIENT CONSULTATION SUMMARY & CASE RECORD"
+        documentSubTitle="Official Clinical Record · TOSH Foundation"
+      />
+      <PrintPatientMeta
+        patient={patient}
+        visitedAt={clinical.visitedAt}
+        doctorName={doctorNames[department]}
+        tokenOrVisitLabel="OPD Consultation Record"
+      />
+
+      {clinical.diagnosis && (
+        <div className="print-diagnosis-banner">
+          <span className="print-diag-label">Clinical Diagnosis:</span>
+          <strong className="print-diag-value">{clinical.diagnosis}</strong>
+        </div>
+      )}
+
+      <PrintVitalsPanel vitals={clinical.vitals} />
+
+      <div className="print-notes-section">
+        {clinical.symptoms && (
+          <div className="print-block">
+            <div className="print-block-heading">Chief Complaints & Presenting Symptoms</div>
+            <p className="print-block-content">{clinical.symptoms}</p>
+          </div>
+        )}
+
+        {clinical.medicalHistory && (
+          <div className="print-block">
+            <div className="print-block-heading">Relevant Medical / Surgical History</div>
+            <p className="print-block-content">{clinical.medicalHistory}</p>
+          </div>
+        )}
+
+        <div className="print-block">
+          <div className="print-block-heading">Allergies & Drug Reactions</div>
+          <p className={`print-block-content${clinical.allergies ? ' print-allergy-alert' : ''}`}>
+            {clinical.allergies ? clinical.allergies : 'No known drug allergies (NKDA)'}
+          </p>
+        </div>
+
+        {clinical.examination && (
+          <div className="print-block">
+            <div className="print-block-heading">Physical Examination & Clinical Observations</div>
+            <p className="print-block-content">{clinical.examination}</p>
+          </div>
+        )}
+
+        {department === 'orthopaedics' && (clinical.painLocation || clinical.side) && (
+          <div className="print-block">
+            <div className="print-block-heading">Orthopaedic Body Region Assessment</div>
+            <p className="print-block-content">
+              <strong>Region:</strong> {clinical.painLocation || 'General musculoskeletal'} · <strong>Side:</strong> {clinical.side || 'Not specified'}
+            </p>
+          </div>
+        )}
+
+        {clinical.assessment && (
+          <div className="print-block">
+            <div className="print-block-heading">Clinical Assessment & Doctor Notes</div>
+            <p className="print-block-content">{clinical.assessment}</p>
+          </div>
+        )}
+
+        {clinical.treatmentPlan && (
+          <div className="print-block">
+            <div className="print-block-heading">Treatment Plan & Medical Advice</div>
+            <p className="print-block-content">{clinical.treatmentPlan}</p>
+          </div>
+        )}
+      </div>
+
+      {clinical.prescription.length > 0 && (
+        <div className="print-block print-no-break" style={{ marginTop: 14 }}>
+          <div className="print-block-heading">Prescribed Medications (Rx)</div>
+          <PrintRxTable items={clinical.prescription} />
+        </div>
+      )}
+
+      <PrintDoctorSignatureBlock
+        doctorName={doctorNames[department]}
+        department={department}
+        date={clinical.visitedAt}
+      />
+    </section>
+
+    {/* Printable Prescription Sheet */}
+    <section className="print-sheet prescription-print-sheet" aria-label="Printable prescription">
+      <PrintLetterhead
+        department={department}
+        documentTitle="PRESCRIPTION / MEDICAL ORDER"
+        documentSubTitle="Outpatient Pharmacy Dispensation & Administration Record"
+      />
+      <PrintPatientMeta
+        patient={patient}
+        visitedAt={clinical.visitedAt}
+        doctorName={doctorNames[department]}
+        tokenOrVisitLabel="Medical Prescription (Rx)"
+      />
+
+      {clinical.diagnosis && (
+        <div className="print-diagnosis-banner">
+          <span className="print-diag-label">Clinical Indication / Diagnosis:</span>
+          <strong className="print-diag-value">{clinical.diagnosis}</strong>
+        </div>
+      )}
+
+      <PrintRxTable items={clinical.prescription} />
+
+      {clinical.prescriptionImages && clinical.prescriptionImages.length > 0 && (
+        <div className="print-prescription-images-wrap">
+          <div className="print-block-heading">Prescription Attachments / Scanned Pages</div>
+          <div className="print-prescription-images-grid">
+            {clinical.prescriptionImages.map((img, i) => (
+              <div key={img.id} className="print-prescription-img-tile">
+                <img src={img.dataUrl} alt={img.name} />
+                <span>Page {i + 1}: {img.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {clinical.treatmentPlan && (
+        <div className="print-block print-no-break" style={{ marginTop: 12 }}>
+          <div className="print-block-heading">Advice & Instructions</div>
+          <p className="print-block-content">{clinical.treatmentPlan}</p>
+        </div>
+      )}
+
+      <PrintDoctorSignatureBlock
+        doctorName={doctorNames[department]}
+        department={department}
+        date={clinical.visitedAt}
+      />
+    </section>
   </>;
 }
-
-function PrintHeader({ department }: { department: Department }) { return <div className="print-brand"><strong>Northstar Medical</strong><span>{departmentLabel(department)} · Pune</span></div>; }
-function PrintBlock({ title, content }: { title: string; content: string }) { return <div className="print-block"><h2>{title}</h2><p>{content || '—'}</p></div>; }

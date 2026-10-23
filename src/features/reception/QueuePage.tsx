@@ -15,7 +15,7 @@ import { Card, SectionHeading } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Field, TextAreaField } from '../../components/ui/Field';
 
-const doctors: Record<Department, string[]> = { skin: ['Dr. Nisha Kulkarni'], orthopaedics: ['Dr. Raghav Menon'] };
+const doctors: Record<Department, string[]> = { skin: ['Dr. Sangamitra'], orthopaedics: ['Dr. Sundarprakash'] };
 const defaults = { fullName: '', dateOfBirth: '', gender: 'Prefer not to say' as Gender, phone: '', email: '', address: '', emergencyContact: '' };
 const blankVitals = (): Vitals => ({ bloodPressure: '', pulse: '', temperature: '', height: '', weight: '', oxygenSaturation: '' });
 const vitalFields: { key: keyof Vitals; label: string; placeholder: string }[] = [
