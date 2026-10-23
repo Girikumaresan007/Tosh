@@ -44,6 +44,19 @@ export async function createBrowserDemoDocument(
   };
 }
 
+export async function createBrowserDemoDocuments(
+  files: File[],
+  patientId: string,
+  category: string
+): Promise<PatientDocument[]> {
+  const docs: PatientDocument[] = [];
+  for (const file of files) {
+    const doc = await createBrowserDemoDocument(file, patientId, category);
+    docs.push(doc);
+  }
+  return docs;
+}
+
 /** Browser-only helper for prescription images in any format. */
 export async function createPrescriptionImage(file: File, customName?: string): Promise<PrescriptionImage> {
   if (!isImageFile(file)) {

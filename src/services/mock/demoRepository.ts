@@ -213,28 +213,91 @@ export class DemoHospitalRepository {
     this.save({ ...this.state, followUps: this.state.followUps.map((entry) => entry.id === id ? { ...entry, ...patch } : entry) });
   }
 
-  addDocument(patientId: string, department: Department, document: Omit<PatientDocument, 'id' | 'patientId' | 'uploadedAt'>, visitId?: string) {
+  addDocuments(
+    patientId: string,
+    department: Department,
+    documents: Array<Omit<PatientDocument, 'id' | 'patientId' | 'uploadedAt'> | PatientDocument>,
+    visitId?: string,
+    queueId?: string
+  ): PatientDocument[] {
     this.requireDemo();
-    this.assertVisitId(visitId);
-    const linked = visitId ? this.state.consultations.find((entry) => entry.id === visitId) : undefined;
-    if (linked && (linked.patientId !== patientId || linked.department !== department)) throw new Error('This visit ID does not belong to the selected patient and department.');
-    const visit = visitId ? linked ?? blankConsultation(patientId, department, visitId) : this.state.consultations.find((entry) => entry.patientId === patientId && entry.department === department) ?? blankConsultation(patientId, department);
-    const entry: PatientDocument = { ...document, id: `DOC-${Date.now()}`, patientId, uploadedAt: stamp() };
-    const updated = { ...visit, documents: [...visit.documents, entry] };
-    const consultations = this.state.consultations.some((item) => item.id === visit.id)
-      ? this.state.consultations.map((item) => item.id === visit.id ? updated : item)
+    let effectiveVisitId = visitId;
+    let queue = this.state.queue;
+
+    if (queueId) {
+      const qEntry = queue.find((q) => q.id === queueId);
+      if (qEntry) {
+        if (!effectiveVisitId && qEntry.visitId) {
+          effectiveVisitId = qEntry.visitId;
+        } else if (!effectiveVisitId) {
+          effectiveVisitId = `VIS-${Date.now()}`;
+          queue = queue.map((q) => (q.id === queueId ? { ...q, visitId: effectiveVisitId } : q));
+        }
+      }
+    }
+
+    this.assertVisitId(effectiveVisitId);
+    const linked = effectiveVisitId
+      ? this.state.consultations.find((entry) => entry.id === effectiveVisitId)
+      : undefined;
+
+    if (linked && (linked.patientId !== patientId || linked.department !== department)) {
+      throw new Error('This visit ID does not belong to the selected patient and department.');
+    }
+
+    const visit = effectiveVisitId
+      ? (linked ?? blankConsultation(patientId, department, effectiveVisitId))
+      : (this.state.consultations.find((entry) => entry.patientId === patientId && entry.department === department) ??
+         blankConsultation(patientId, department));
+
+    const newEntries: PatientDocument[] = documents.map((doc, idx) => ({
+      ...doc,
+      id: ('id' in doc && doc.id) ? doc.id : `DOC-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+      patientId,
+      uploadedAt: ('uploadedAt' in doc && doc.uploadedAt) ? doc.uploadedAt : stamp(),
+    }));
+
+    const updated = { ...visit, documents: [...visit.documents, ...newEntries] };
+    const exists = this.state.consultations.some((item) => item.id === visit.id);
+    const consultations = exists
+      ? this.state.consultations.map((item) => (item.id === visit.id ? updated : item))
       : [updated, ...this.state.consultations];
-    this.save({ ...this.state, consultations });
+
+    this.save({ ...this.state, queue, consultations });
+    return newEntries;
   }
 
-  removeDocument(patientId: string, department: Department, documentId: string, visitId?: string) {
+  addDocument(
+    patientId: string,
+    department: Department,
+    document: Omit<PatientDocument, 'id' | 'patientId' | 'uploadedAt'> | PatientDocument,
+    visitId?: string,
+    queueId?: string
+  ): PatientDocument {
+    return this.addDocuments(patientId, department, [document], visitId, queueId)[0];
+  }
+
+  removeDocument(patientId: string, department?: Department, documentId?: string, visitId?: string) {
     this.requireDemo();
+    if (!documentId) return;
     this.assertVisitId(visitId);
-    const target = visitId ? this.state.consultations.find((visit) => visit.id === visitId) : this.state.consultations.find((visit) => visit.patientId === patientId && visit.department === department && visit.documents.some((document) => document.id === documentId));
+    const target = visitId
+      ? this.state.consultations.find((visit) => visit.id === visitId)
+      : this.state.consultations.find(
+          (visit) =>
+            visit.patientId === patientId &&
+            (!department || visit.department === department) &&
+            visit.documents.some((document) => document.id === documentId)
+        );
     if (!target) throw new Error('The document visit could not be found.');
-    if (target.patientId !== patientId || target.department !== department) throw new Error('This visit ID does not belong to the selected patient and department.');
+    if (target.patientId !== patientId) throw new Error('This visit does not belong to the selected patient.');
     if (!target.documents.some((document) => document.id === documentId)) throw new Error('The document could not be found in this visit.');
-    this.save({ ...this.state, consultations: this.state.consultations.map((visit) => visit.id === target.id ? { ...visit, documents: visit.documents.filter((document) => document.id !== documentId) } : visit) });
+    this.save({
+      ...this.state,
+      consultations: this.state.consultations.map((visit) =>
+        visit.id === target.id ? { ...visit, documents: visit.documents.filter((document) => document.id !== documentId) } : visit
+      ),
+    });
   }
 
   updateFee(department: Department, amount: number) {
