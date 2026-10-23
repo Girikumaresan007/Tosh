@@ -24,6 +24,7 @@ const navByRole: Record<PortalRole, NavItem[]> = {
     { label: 'Consultation', to: '/skin/consultation', icon: Stethoscope },
     { label: 'Charges', to: '/skin/charges', icon: CreditCard },
     { label: 'Follow-ups', to: '/skin/follow-ups', icon: MessageCircle },
+    { label: 'Reports', to: '/skin/reports', icon: FileBarChart2 },
     { label: 'Visit History', to: '/skin/history', icon: History },
   ],
   orthopaedics: [
@@ -34,6 +35,7 @@ const navByRole: Record<PortalRole, NavItem[]> = {
     { label: 'Body Region Templates', to: '/ortho/templates', icon: Bone },
     { label: 'Charges', to: '/ortho/charges', icon: CreditCard },
     { label: 'Follow-ups', to: '/ortho/follow-ups', icon: MessageCircle },
+    { label: 'Reports', to: '/ortho/reports', icon: FileBarChart2 },
     { label: 'Visit History', to: '/ortho/history', icon: History },
   ],
 };
@@ -77,7 +79,16 @@ export function AppShell() {
     }
   }, [location.pathname, location.search]);
 
-  useEffect(() => { setMobileOpen(false); setShowAlerts(false); setSearchFocused(false); }, [location.pathname]);
+  useEffect(() => {
+    setMobileOpen(false);
+    setShowAlerts(false);
+    setSearchFocused(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
+    document.body.scrollTo({ top: 0, behavior: 'smooth' });
+    const mainCol = document.querySelector('.main-column');
+    if (mainCol) mainCol.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname]);
 
   // Handle outside click to close search popup
   useEffect(() => {
@@ -165,7 +176,7 @@ export function AppShell() {
           <button ref={mobileMenuButtonRef} className="icon-button mobile-menu-button" type="button" aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'} aria-controls="primary-navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen((value) => !value)}>{mobileOpen ? <X size={19} /> : <Menu size={19} />}</button>
           <button className="icon-button desktop-collapse" type="button" aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}</button>
           <div><div className="topbar-title">{title}</div><div className="topbar-date">{new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date())} · {info.label}</div></div>
-          
+
           <div className="topbar-search-container" ref={searchContainerRef}>
             <form className="topbar-search" role="search" onSubmit={submitSearch}>
               <Search size={15} />
@@ -234,7 +245,11 @@ export function AppShell() {
           <button className="icon-button mobile-logout" type="button" aria-label="Log out" onClick={signOut}><LogOut size={16} /></button>
         </div>
       </header>
-      <main className="page-content"><Outlet /></main>
+      <main className="page-content">
+        <div key={location.pathname} className="page-transition-wrap">
+          <Outlet />
+        </div>
+      </main>
     </div>
   </div>;
 }

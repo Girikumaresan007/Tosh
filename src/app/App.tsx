@@ -16,6 +16,7 @@ import { ClinicalWorkspace } from '../features/doctors/ClinicalWorkspace';
 import { BodyRegionTemplatesPage } from '../features/doctors/BodyRegionTemplatesPage';
 import { DoctorPrescriptionsPage, DoctorTreatmentsPage, DoctorHistoryPage } from '../features/doctors/DoctorRecordPages';
 import { DoctorChargesPage } from '../features/doctors/DoctorChargesPage';
+import { DoctorReportsPage } from '../features/doctors/DoctorReportsPage';
 
 export function App() {
   return (
@@ -43,6 +44,7 @@ export function App() {
         <Route path="prescriptions" element={<DoctorPrescriptionsPage department="skin" />} />
         <Route path="treatments" element={<DoctorTreatmentsPage department="skin" />} />
         <Route path="follow-ups" element={<FollowUpsPage department="skin" />} />
+        <Route path="reports" element={<DoctorReportsPage department="skin" />} />
         <Route path="history" element={<DoctorHistoryPage department="skin" />} />
       </Route>
       <Route path="/ortho" element={<AppShell />}>
@@ -57,6 +59,7 @@ export function App() {
         <Route path="prescriptions" element={<DoctorPrescriptionsPage department="orthopaedics" />} />
         <Route path="treatments" element={<DoctorTreatmentsPage department="orthopaedics" />} />
         <Route path="follow-ups" element={<FollowUpsPage department="orthopaedics" />} />
+        <Route path="reports" element={<DoctorReportsPage department="orthopaedics" />} />
         <Route path="history" element={<DoctorHistoryPage department="orthopaedics" />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
