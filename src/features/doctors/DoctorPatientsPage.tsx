@@ -9,6 +9,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, SectionHeading } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { TablePagination, usePagination } from '../../components/ui/Pagination';
 
 export function DoctorPatientsPage({ department }: { department: Department }) {
   const { state } = useHospitalData();
@@ -88,14 +89,7 @@ export function DoctorPatientsPage({ department }: { department: Department }) {
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
   }, [department, departmentPatients, query, selectedDate, state.appointments, state.consultations]);
 
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 8;
-  const totalPages = Math.max(1, Math.ceil(patients.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return patients.slice(start, start + PAGE_SIZE);
-  }, [patients, currentPage]);
+  const { page, setPage, pageSize, setPageSize, pagedItems: paginatedRows, total } = usePagination(patients, 5);
 
   return <>
     <PageHeading eyebrow={`${department === 'skin' ? 'Skin & Dermatology' : 'Orthopaedics'} · Records`} title="Patients" description="Open authorized fictional history and continue into a consultation workspace." actions={<Badge tone="info">{patients.length} records</Badge>} />
@@ -177,7 +171,7 @@ export function DoctorPatientsPage({ department }: { department: Department }) {
               </thead>
               <tbody>
                 {paginatedRows.map((patient, index) => {
-                  const sno = (currentPage - 1) * PAGE_SIZE + index + 1;
+                  const sno = (page - 1) * pageSize + index + 1;
                   const visit = state.consultations.find((item) => item.patientId === patient.id && item.department === department);
                   const matchingVisit = selectedDate
                     ? state.consultations.find(
@@ -246,42 +240,13 @@ export function DoctorPatientsPage({ department }: { department: Department }) {
             })}
           </div>
 
-          <div
-            className="table-footer"
-            style={{
-              padding: '16px 24px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderTop: '1px solid var(--line)',
-            }}
-          >
-            <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, patients.length)} of{' '}
-              {patients.length} patients
-            </span>
-            <div className="button-row">
-              <Button
-                variant="secondary"
-                size="small"
-                disabled={currentPage <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <span style={{ fontSize: 13, fontWeight: 600, padding: '0 8px' }}>
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="secondary"
-                size="small"
-                disabled={currentPage >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </>
       ) : (
         <EmptyState

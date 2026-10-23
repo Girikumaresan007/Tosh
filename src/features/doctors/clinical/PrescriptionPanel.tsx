@@ -1,5 +1,5 @@
 import { useRef, useState, useMemo, useEffect, type ChangeEvent, type DragEvent } from 'react';
-import { Bone, CheckSquare, Download, Eye, Pill, Plus, Printer, Square, Trash2, UploadCloud } from 'lucide-react';
+import { Bone, CheckSquare, Download, Eye, FileText, Pill, Plus, Printer, Square, Trash2, UploadCloud } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { prescriptionSchema } from '../../../schemas/forms';
@@ -7,11 +7,12 @@ import type { Consultation, PrescriptionImage, PrescriptionItem } from '../../..
 import { readBodyRegionTemplates } from './bodyRegionTemplates';
 import { useToast } from '../../../components/ui/Toast';
 import { Button } from '../../../components/ui/Button';
+import { Badge } from '../../../components/ui/Badge';
 import { Card, SectionHeading } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Field, TextAreaField } from '../../../components/ui/Field';
 import { Modal } from '../../../components/ui/Modal';
-import { createPrescriptionImage } from '../../../services/documents/browserDocumentService';
+import { createPrescriptionImage, isImageFile } from '../../../services/documents/browserDocumentService';
 import { dateLabel } from '../../../utils/format';
 
 const blank = { medicineName: '', strength: '', dosage: '', route: '', frequency: '', duration: '', instructions: '' };
@@ -191,13 +192,13 @@ export function PrescriptionPanel({
           }
         />
 
-        {/* Section 1: Prescription Image Upload */}
+        {/* Section 1: Prescription Attachments (Images, PDFs, Scans) */}
         <div className="prescription-image-section" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div>
-              <strong style={{ fontSize: 13, color: 'var(--navy)', display: 'block' }}>Prescription Images / Handwritten Rx</strong>
-              <span style={{ fontSize: 10, color: 'var(--muted)' }}>
-                Upload photos or scans of physical prescription sheets in any image format (JPG, PNG, WebP, AVIF, GIF, SVG).
+              <strong style={{ fontSize: 13, color: 'var(--navy)', display: 'block' }}>Prescription Attachments / Handwritten Rx</strong>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                Upload photos, scans, or PDF documents of physical prescription sheets in any format (PDF, JPG, PNG, WebP, AVIF, SVG, etc.).
               </span>
             </div>
             <Button
@@ -207,7 +208,7 @@ export function PrescriptionPanel({
               icon={<Plus size={14} />}
               disabled={uploadingImage}
             >
-              {uploadingImage ? 'Uploading…' : 'Upload Rx Image'}
+              {uploadingImage ? 'Uploading…' : 'Upload Rx Attachment'}
             </Button>
           </div>
 
@@ -216,7 +217,7 @@ export function PrescriptionPanel({
             className="sr-only"
             id="prescription-image-upload"
             type="file"
-            accept="image/*,.jpg,.jpeg,.png,.webp,.avif,.gif,.bmp,.svg"
+            accept="image/*,application/pdf,.pdf,.doc,.docx,.txt"
             multiple
             onChange={onImageSelect}
           />
@@ -242,11 +243,11 @@ export function PrescriptionPanel({
             onDrop={onDrop}
           >
             <UploadCloud size={24} color="#177E89" />
-            <strong style={{ fontSize: 11, color: 'var(--navy)' }}>
-              {uploadingImage ? 'Reading prescription image…' : 'Choose prescription image or drag & drop here'}
+            <strong style={{ fontSize: 12, color: 'var(--navy)' }}>
+              {uploadingImage ? 'Reading prescription attachment…' : 'Choose prescription file (PDF or image) or drag & drop here'}
             </strong>
-            <span style={{ fontSize: 9, color: 'var(--muted)' }}>
-              Supports all image formats (JPG, PNG, WebP, AVIF, GIF, BMP, SVG) · Multiple images supported
+            <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>
+              Supports all image formats (JPG, PNG, WebP, SVG, AVIF, etc.) and PDF documents · Multiple files supported
             </span>
           </div>
 
@@ -254,91 +255,139 @@ export function PrescriptionPanel({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
                 gap: 12,
                 marginTop: 12,
               }}
             >
-              {prescriptionImages.map((img, idx) => (
-                <div
-                  key={img.id}
-                  style={{
-                    border: '1px solid var(--line)',
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    background: '#fff',
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                >
+              {prescriptionImages.map((img, idx) => {
+                const isPdf = img.mimeType === 'application/pdf' || img.name.toLowerCase().endsWith('.pdf');
+                const isImg = img.mimeType?.startsWith('image/') || isImageFile({ name: img.name, type: img.mimeType } as File);
+
+                return (
                   <div
+                    key={img.id}
                     style={{
-                      height: 120,
-                      background: '#F1F5F9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
                       overflow: 'hidden',
+                      background: '#fff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                     }}
-                    onClick={() => setPreviewImage(img)}
-                    title="Click to zoom / preview"
                   >
-                    <img
-                      src={img.dataUrl}
-                      alt={img.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </div>
-                  <div style={{ padding: '8px 10px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <strong
+                    <div
                       style={{
-                        fontSize: 10,
-                        color: 'var(--navy)',
+                        height: 130,
+                        background: '#F1F5F9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        position: 'relative',
                       }}
-                      title={img.name}
+                      onClick={() => setPreviewImage(img)}
+                      title="Click to preview"
                     >
-                      Rx Page {idx + 1}: {img.name}
-                    </strong>
-                    <span style={{ fontSize: 8, color: 'var(--muted)' }}>
-                      {(img.size / 1024).toFixed(0)} KB · {dateLabel(img.uploadedAt, 'd MMM · h:mm a')}
-                    </span>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        onClick={() => setPreviewImage(img)}
-                        icon={<Eye size={12} />}
-                        style={{ padding: '3px 7px', fontSize: 9 }}
+                      {isImg ? (
+                        <img
+                          src={img.dataUrl}
+                          alt={img.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : isPdf ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#DC2626' }}>
+                          <FileText size={40} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--navy)' }}>PDF Document</span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: 'var(--teal)' }}>
+                          <FileText size={40} />
+                          <span style={{ fontSize: 11, fontWeight: 600 }}>File</span>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                        <strong
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: 'var(--navy)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            flex: 1,
+                          }}
+                          title={img.name}
+                        >
+                          Rx Page {idx + 1}: {img.name}
+                        </strong>
+                        <Badge tone={isPdf ? 'danger' : isImg ? 'info' : 'neutral'}>
+                          {isPdf ? 'PDF' : isImg ? 'Image' : 'Doc'}
+                        </Badge>
+                      </div>
+                      <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        {(img.size / 1024).toFixed(0)} KB · {dateLabel(img.uploadedAt, 'd MMM · h:mm a')}
+                      </span>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 6,
+                          marginTop: 'auto',
+                          paddingTop: 8,
+                          borderTop: '1px solid #EDF2F4',
+                        }}
                       >
-                        Preview
-                      </Button>
-                      <a
-                        href={img.dataUrl}
-                        download={img.name}
-                        className="btn btn-ghost btn-small"
-                        style={{ padding: '3px 7px', fontSize: 9, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                      >
-                        <Download size={12} />
-                        Download
-                      </a>
-                      <Button
-                        variant="ghost"
-                        size="small"
-                        onClick={() => removeImage(img.id, img.name)}
-                        icon={<Trash2 size={12} />}
-                        style={{ padding: '3px 7px', fontSize: 9, marginLeft: 'auto', color: '#BC4D52' }}
-                        aria-label="Remove image"
-                      >
-                        Delete
-                      </Button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Button
+                            variant="secondary"
+                            size="small"
+                            onClick={() => setPreviewImage(img)}
+                            icon={<Eye size={13} />}
+                            style={{ padding: '4px 8px', fontSize: 11, height: 28 }}
+                          >
+                            Preview
+                          </Button>
+                          <a
+                            href={img.dataUrl}
+                            download={img.name}
+                            className="btn btn-secondary btn-small"
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: 11,
+                              height: 28,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              textDecoration: 'none',
+                            }}
+                            title="Download file"
+                          >
+                            <Download size={13} />
+                            Download
+                          </a>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          onClick={() => removeImage(img.id, img.name)}
+                          icon={<Trash2 size={13} />}
+                          style={{ padding: '4px 8px', fontSize: 11, height: 28, color: '#DC2626' }}
+                          aria-label="Delete prescription file"
+                          title="Delete file"
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -682,34 +731,47 @@ export function PrescriptionPanel({
         </div>
       </Card>
 
-      {/* Prescription Image Modal Preview */}
+      {/* Prescription Attachment Modal Preview */}
       <Modal
         open={Boolean(previewImage)}
-        title={previewImage?.name ?? 'Prescription Image'}
-        subtitle="Prescription image preview"
+        title={previewImage?.name ?? 'Prescription File Preview'}
+        subtitle={previewImage ? `${((previewImage.size) / 1024).toFixed(0)} KB · Uploaded ${dateLabel(previewImage.uploadedAt, 'd MMM yyyy · h:mm a')}` : undefined}
         onClose={() => setPreviewImage(null)}
-        wide
+        className="modal-fit-media"
       >
-        {previewImage && (
-          <div style={{ textAlign: 'center', padding: 8 }}>
-            <img
-              src={previewImage.dataUrl}
-              alt={previewImage.name}
-              style={{
-                maxWidth: '100%',
-                maxHeight: '75vh',
-                objectFit: 'contain',
-                borderRadius: 8,
-                boxShadow: '0 4px 18px rgba(0,0,0,0.12)',
-              }}
-            />
-            <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center', gap: 10 }}>
-              <a href={previewImage.dataUrl} download={previewImage.name} className="btn btn-secondary">
-                <Download size={14} /> Download Original Image
-              </a>
+        {previewImage && (() => {
+          const isPdf = previewImage.mimeType === 'application/pdf' || previewImage.name.toLowerCase().endsWith('.pdf');
+          const isImg = previewImage.mimeType?.startsWith('image/') || isImageFile({ name: previewImage.name, type: previewImage.mimeType } as File);
+
+          return (
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              {isPdf ? (
+                <iframe
+                  className="prescription-preview-pdf"
+                  src={previewImage.dataUrl}
+                  title={`Preview of ${previewImage.name}`}
+                />
+              ) : isImg ? (
+                <img
+                  className="prescription-preview-img"
+                  src={previewImage.dataUrl}
+                  alt={previewImage.name}
+                />
+              ) : (
+                <div style={{ padding: '36px 24px', textAlign: 'center', background: '#fff', borderRadius: 8, border: '1px solid var(--line)' }}>
+                  <FileText size={48} color="var(--teal)" style={{ marginBottom: 12 }} />
+                  <strong style={{ display: 'block', fontSize: 14, color: 'var(--navy)' }}>{previewImage.name}</strong>
+                  <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>This document can be downloaded and opened with your local application.</p>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, width: '100%', marginTop: 4 }}>
+                <a href={previewImage.dataUrl} download={previewImage.name} className="btn btn-secondary">
+                  <Download size={14} /> Download Original File
+                </a>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
     </div>
   );

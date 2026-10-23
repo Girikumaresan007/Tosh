@@ -10,6 +10,7 @@ export function Modal({
   children,
   footer,
   wide = false,
+  className,
 }: PropsWithChildren<{
   title: string;
   subtitle?: string;
@@ -17,6 +18,7 @@ export function Modal({
   onClose: () => void;
   footer?: ReactNode;
   wide?: boolean;
+  className?: string;
 }>) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -65,7 +67,7 @@ export function Modal({
     >
       <div
         ref={dialogRef}
-        className={`modal${wide ? ' wide' : ''}`}
+        className={`modal${wide ? ' wide' : ''}${className ? ` ${className}` : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

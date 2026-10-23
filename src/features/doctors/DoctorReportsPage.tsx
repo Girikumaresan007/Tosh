@@ -37,6 +37,7 @@ import { Badge, statusTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, SectionHeading, StatCard } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { TablePagination, usePagination } from '../../components/ui/Pagination';
 import { DOCTOR_DETAILS, PrintLetterhead } from '../../components/shared/PrintTemplates';
 
 type DatePreset = 'today' | 'yesterday' | 'week' | 'month' | 'all';
@@ -279,6 +280,15 @@ export function DoctorReportsPage({ department }: { department: Department }) {
       };
     });
   }, [deptAppointments, state.patients, state.invoices, state.consultations, state.queue, department]);
+
+  const {
+    page: rosterPage,
+    setPage: setRosterPage,
+    pageSize: rosterPageSize,
+    setPageSize: setRosterPageSize,
+    pagedItems: pagedRoster,
+    total: rosterTotal,
+  } = usePagination(patientRoster, 5);
 
   const printDailyReport = () => {
     document.body.classList.add('print-doctor-report');
@@ -612,82 +622,92 @@ export function DoctorReportsPage({ department }: { department: Department }) {
           </div>
 
           {patientRoster.length ? (
-            <div className="table-wrap responsive-cards">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '8%' }}>Time / Token</th>
-                    <th style={{ width: '22%' }}>Patient Name & UHID</th>
-                    <th style={{ width: '12%' }}>Type</th>
-                    <th style={{ width: '20%' }}>Clinical Indication / Diagnosis</th>
-                    <th style={{ width: '10%', textAlign: 'center' }}>Rx Items</th>
-                    <th style={{ width: '10%', textAlign: 'right' }}>Consult Fee</th>
-                    <th style={{ width: '10%', textAlign: 'right' }}>Total Bill</th>
-                    <th style={{ width: '8%', textAlign: 'center' }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {patientRoster.map((row) => (
-                    <tr key={row.id}>
-                      <td>
-                        <strong>{row.time}</strong>
-                        <div style={{ fontSize: 10, color: '#64748B' }}>Tok: {row.token}</div>
+            <>
+              <div className="table-wrap responsive-cards">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '8%' }}>Time / Token</th>
+                      <th style={{ width: '22%' }}>Patient Name & UHID</th>
+                      <th style={{ width: '12%' }}>Type</th>
+                      <th style={{ width: '20%' }}>Clinical Indication / Diagnosis</th>
+                      <th style={{ width: '10%', textAlign: 'center' }}>Rx Items</th>
+                      <th style={{ width: '10%', textAlign: 'right' }}>Consult Fee</th>
+                      <th style={{ width: '10%', textAlign: 'right' }}>Total Bill</th>
+                      <th style={{ width: '8%', textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedRoster.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          <strong>{row.time}</strong>
+                          <div style={{ fontSize: 10, color: '#64748B' }}>Tok: {row.token}</div>
+                        </td>
+                        <td>
+                          <PatientCell name={row.patientName} id={row.patientId} />
+                          <div style={{ fontSize: 10, color: '#64748B', marginTop: 1 }}>{row.ageGender} · {row.phone}</div>
+                        </td>
+                        <td>
+                          <Badge tone={row.visitType === 'New' ? 'info' : row.visitType === 'Walk-in' ? 'warn' : 'neutral'}>
+                            {row.visitType}
+                          </Badge>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#17324D', fontSize: 12 }}>{row.diagnosis}</div>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          {row.medsCount > 0 ? (
+                            <span style={{ background: '#E6F4F1', color: '#177E89', padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 700 }}>
+                              {row.medsCount} meds
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94A3B8', fontSize: 11 }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>{money(row.fee)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F172A' }}>
+                          {money(row.totalAmount)}
+                          {row.addedCharges > 0 && (
+                            <div style={{ fontSize: 9.5, color: '#177E89' }}>+{money(row.addedCharges)} Proc</div>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <Badge tone={statusTone(row.status)}>{row.status}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#F8FAFC', fontWeight: 700, borderTop: '2px solid #CBD5E1' }}>
+                      <td colSpan={3}>
+                        <strong>TOTAL SUMMARY ({patientRoster.length} Patients)</strong>
                       </td>
-                      <td>
-                        <PatientCell name={row.patientName} id={row.patientId} />
-                        <div style={{ fontSize: 10, color: '#64748B', marginTop: 1 }}>{row.ageGender} · {row.phone}</div>
+                      <td colSpan={2} style={{ textAlign: 'center' }}>
+                        {patientRoster.filter((p) => p.medsCount > 0).length} Prescriptions Written
                       </td>
-                      <td>
-                        <Badge tone={row.visitType === 'New' ? 'info' : row.visitType === 'Walk-in' ? 'warn' : 'neutral'}>
-                          {row.visitType}
-                        </Badge>
+                      <td style={{ textAlign: 'right', color: '#177E89' }}>
+                        {money(patientRoster.reduce((sum, r) => sum + r.fee, 0))}
                       </td>
-                      <td>
-                        <div style={{ fontWeight: 600, color: '#17324D', fontSize: 12 }}>{row.diagnosis}</div>
+                      <td style={{ textAlign: 'right', color: '#0F172A', fontSize: 13 }}>
+                        {money(patientRoster.reduce((sum, r) => sum + r.totalAmount, 0))}
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        {row.medsCount > 0 ? (
-                          <span style={{ background: '#E6F4F1', color: '#177E89', padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 700 }}>
-                            {row.medsCount} meds
-                          </span>
-                        ) : (
-                          <span style={{ color: '#94A3B8', fontSize: 11 }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{money(row.fee)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F172A' }}>
-                        {money(row.totalAmount)}
-                        {row.addedCharges > 0 && (
-                          <div style={{ fontSize: 9.5, color: '#177E89' }}>+{money(row.addedCharges)} Proc</div>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <Badge tone={statusTone(row.status)}>{row.status}</Badge>
+                        <span style={{ color: '#107E5B', fontSize: 10 }}>VERIFIED</span>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ background: '#F8FAFC', fontWeight: 700, borderTop: '2px solid #CBD5E1' }}>
-                    <td colSpan={3}>
-                      <strong>TOTAL SUMMARY ({patientRoster.length} Patients)</strong>
-                    </td>
-                    <td colSpan={2} style={{ textAlign: 'center' }}>
-                      {patientRoster.filter((p) => p.medsCount > 0).length} Prescriptions Written
-                    </td>
-                    <td style={{ textAlign: 'right', color: '#177E89' }}>
-                      {money(patientRoster.reduce((sum, r) => sum + r.fee, 0))}
-                    </td>
-                    <td style={{ textAlign: 'right', color: '#0F172A', fontSize: 13 }}>
-                      {money(patientRoster.reduce((sum, r) => sum + r.totalAmount, 0))}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span style={{ color: '#107E5B', fontSize: 10 }}>VERIFIED</span>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                  </tfoot>
+                </table>
+              </div>
+
+              <TablePagination
+                page={rosterPage}
+                pageSize={rosterPageSize}
+                total={rosterTotal}
+                onPageChange={setRosterPage}
+                onPageSizeChange={setRosterPageSize}
+              />
+            </>
           ) : (
             <EmptyState
               title="No patients found for this date range"

@@ -215,12 +215,22 @@ export function ClinicalWorkspace({ department }: { department: Department }) {
         <div className="print-prescription-images-wrap">
           <div className="print-block-heading">Prescription Attachments / Scanned Pages</div>
           <div className="print-prescription-images-grid">
-            {clinical.prescriptionImages.map((img, i) => (
-              <div key={img.id} className="print-prescription-img-tile">
-                <img src={img.dataUrl} alt={img.name} />
-                <span>Page {i + 1}: {img.name}</span>
-              </div>
-            ))}
+            {clinical.prescriptionImages.map((img, i) => {
+              const isPdf = img.mimeType === 'application/pdf' || img.name.toLowerCase().endsWith('.pdf');
+              return (
+                <div key={img.id} className="print-prescription-img-tile">
+                  {isPdf ? (
+                    <div style={{ padding: '20px 10px', textAlign: 'center', background: '#F8FAFC', borderRadius: 4, border: '1px solid #CBD5E1' }}>
+                      <span style={{ fontWeight: 700, color: '#DC2626', fontSize: 13, display: 'block' }}>[PDF Attachment]</span>
+                      <p style={{ margin: '6px 0 0', fontSize: 11, color: '#334155' }}>{img.name}</p>
+                    </div>
+                  ) : (
+                    <img src={img.dataUrl} alt={img.name} />
+                  )}
+                  <span>Attachment {i + 1}: {img.name}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

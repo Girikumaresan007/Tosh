@@ -10,16 +10,15 @@ import { Button } from '../../components/ui/Button';
 import { Card, SectionHeading } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Modal } from '../../components/ui/Modal';
+import { TablePagination, usePagination } from '../../components/ui/Pagination';
 import { PrintLetterhead, PrintPatientMeta, PrintRxTable, PrintDoctorSignatureBlock } from '../../components/shared/PrintTemplates';
 
 const rolePath = (department: Department) => (department === 'skin' ? 'skin' : 'ortho');
-const PAGE_SIZE = 8;
 
 export function DoctorPrescriptionsPage({ department }: { department: Department }) {
   const { state } = useHospitalData();
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
 
   const records = useMemo(
     () =>
@@ -36,12 +35,7 @@ export function DoctorPrescriptionsPage({ department }: { department: Department
     [department, query, state.consultations, state.patients]
   );
 
-  const totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return records.slice(start, start + PAGE_SIZE);
-  }, [records, currentPage]);
+  const { page, setPage, pageSize, setPageSize, pagedItems: paginatedRows, total } = usePagination(records, 5);
 
   const selected = records.find((item) => item.id === selectedId) ?? null;
   const patient = selected && state.patients.find((item) => item.id === selected.patientId);
@@ -108,7 +102,7 @@ export function DoctorPrescriptionsPage({ department }: { department: Department
                 </thead>
                 <tbody>
                   {paginatedRows.map((visit, index) => {
-                    const sno = (currentPage - 1) * PAGE_SIZE + index + 1;
+                    const sno = (page - 1) * pageSize + index + 1;
                     const recordPatient = state.patients.find((item) => item.id === visit.patientId);
                     return (
                       <tr key={visit.id}>
@@ -142,42 +136,13 @@ export function DoctorPrescriptionsPage({ department }: { department: Department
               </table>
             </div>
 
-            <div
-              className="table-footer"
-              style={{
-                padding: '16px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderTop: '1px solid var(--line)',
-              }}
-            >
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, records.length)} of{' '}
-                {records.length} prescriptions
-              </span>
-              <div className="button-row">
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span style={{ fontSize: 13, fontWeight: 600, padding: '0 8px' }}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </>
         ) : (
           <EmptyState
@@ -275,12 +240,22 @@ function PrescriptionDocument({
         <div className="print-prescription-images-wrap">
           <div className="print-block-heading">Prescription Attachments / Scanned Pages</div>
           <div className="print-prescription-images-grid">
-            {visit.prescriptionImages.map((img, i) => (
-              <div key={img.id} className="print-prescription-img-tile">
-                <img src={img.dataUrl} alt={img.name} />
-                <span>Page {i + 1}: {img.name}</span>
-              </div>
-            ))}
+            {visit.prescriptionImages.map((img, i) => {
+              const isPdf = img.mimeType === 'application/pdf' || img.name.toLowerCase().endsWith('.pdf');
+              return (
+                <div key={img.id} className="print-prescription-img-tile">
+                  {isPdf ? (
+                    <div style={{ padding: '20px 10px', textAlign: 'center', background: '#F8FAFC', borderRadius: 4, border: '1px solid #CBD5E1' }}>
+                      <span style={{ fontWeight: 700, color: '#DC2626', fontSize: 13, display: 'block' }}>[PDF Attachment]</span>
+                      <p style={{ margin: '6px 0 0', fontSize: 11, color: '#334155' }}>{img.name}</p>
+                    </div>
+                  ) : (
+                    <img src={img.dataUrl} alt={img.name} />
+                  )}
+                  <span>Attachment {i + 1}: {img.name}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -305,7 +280,6 @@ export function DoctorTreatmentsPage({ department }: { department: Department })
   const { state } = useHospitalData();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
 
   const records = useMemo(
     () =>
@@ -330,12 +304,7 @@ export function DoctorTreatmentsPage({ department }: { department: Department })
   );
 
   const total = records.reduce((sum, item) => sum + item.charge.amount, 0);
-  const totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return records.slice(start, start + PAGE_SIZE);
-  }, [records, currentPage]);
+  const { page, setPage, pageSize, setPageSize, pagedItems: paginatedRows, total: recordCount } = usePagination(records, 5);
 
   return (
     <>
@@ -407,7 +376,7 @@ export function DoctorTreatmentsPage({ department }: { department: Department })
                 </thead>
                 <tbody>
                   {paginatedRows.map(({ visit, charge, patient }, index) => {
-                    const sno = (currentPage - 1) * PAGE_SIZE + index + 1;
+                    const sno = (page - 1) * pageSize + index + 1;
                     return (
                       <tr key={charge.id}>
                         <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--muted)' }}>{sno}</td>
@@ -441,42 +410,13 @@ export function DoctorTreatmentsPage({ department }: { department: Department })
               </table>
             </div>
 
-            <div
-              className="table-footer"
-              style={{
-                padding: '16px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderTop: '1px solid var(--line)',
-              }}
-            >
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, records.length)} of{' '}
-                {records.length} items
-              </span>
-              <div className="button-row">
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span style={{ fontSize: 13, fontWeight: 600, padding: '0 8px' }}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={recordCount}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </>
         ) : (
           <EmptyState
@@ -496,7 +436,6 @@ export function DoctorHistoryPage({ department }: { department: Department }) {
   const [query, setQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [status, setStatus] = useState('all');
-  const [page, setPage] = useState(1);
 
   const visits = useMemo(
     () =>
@@ -533,12 +472,7 @@ export function DoctorHistoryPage({ department }: { department: Department }) {
     [department, query, selectedDate, state.consultations, state.patients, status]
   );
 
-  const totalPages = Math.max(1, Math.ceil(visits.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return visits.slice(start, start + PAGE_SIZE);
-  }, [visits, currentPage]);
+  const { page, setPage, pageSize, setPageSize, pagedItems: paginatedRows, total } = usePagination(visits, 5);
 
   return (
     <>
@@ -643,7 +577,7 @@ export function DoctorHistoryPage({ department }: { department: Department }) {
                 </thead>
                 <tbody>
                   {paginatedRows.map((visit, index) => {
-                    const sno = (currentPage - 1) * PAGE_SIZE + index + 1;
+                    const sno = (page - 1) * pageSize + index + 1;
                     const patient = state.patients.find((item) => item.id === visit.patientId);
                     return (
                       <tr key={visit.id}>
@@ -696,42 +630,13 @@ export function DoctorHistoryPage({ department }: { department: Department }) {
               </table>
             </div>
 
-            <div
-              className="table-footer"
-              style={{
-                padding: '16px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderTop: '1px solid var(--line)',
-              }}
-            >
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, visits.length)} of{' '}
-                {visits.length} visits
-              </span>
-              <div className="button-row">
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span style={{ fontSize: 13, fontWeight: 600, padding: '0 8px' }}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </>
         ) : (
           <EmptyState

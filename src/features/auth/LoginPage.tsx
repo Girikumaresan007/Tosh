@@ -199,7 +199,10 @@ export function LoginPage() {
         />
         <div className="login-photo-copy">
           <span>One shared care journey</span>
-          <h2>From first hello to follow-up.</h2>
+          <h2 className="login-hero-title">
+            <span className="login-hero-line1">From first hello</span>
+            <span className="login-hero-line2">to follow-up.</span>
+          </h2>
           <p>Keep the details of every visit in view, with calm tools for the front desk and the clinical team.</p>
         </div>
       </aside>

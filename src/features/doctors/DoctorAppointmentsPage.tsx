@@ -11,8 +11,7 @@ import { Badge, statusTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, SectionHeading } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
-
-const PAGE_SIZE = 8;
+import { TablePagination, usePagination } from '../../components/ui/Pagination';
 
 export function DoctorAppointmentsPage({ department }: { department: Department }) {
   const { state, repository } = useHospitalData();
@@ -25,7 +24,6 @@ export function DoctorAppointmentsPage({ department }: { department: Department 
   const [status, setStatus] = useState('all');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [showAllDates, setShowAllDates] = useState(false);
-  const [page, setPage] = useState(1);
 
   const rows = useMemo(() => {
     return state.appointments
@@ -44,12 +42,7 @@ export function DoctorAppointmentsPage({ department }: { department: Department 
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }, [date, department, query, showAllDates, state.appointments, state.patients, status]);
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return rows.slice(start, start + PAGE_SIZE);
-  }, [rows, currentPage]);
+  const { page, setPage, pageSize, setPageSize, pagedItems: paginatedRows, total } = usePagination(rows, 5);
 
   const updateStatus = (id: string, next: 'In progress' | 'Completed') => {
     try {
@@ -156,7 +149,7 @@ export function DoctorAppointmentsPage({ department }: { department: Department 
                 </thead>
                 <tbody>
                   {paginatedRows.map((item, index) => {
-                    const sno = (currentPage - 1) * PAGE_SIZE + index + 1;
+                    const sno = (page - 1) * pageSize + index + 1;
                     const patient = state.patients.find((person) => person.id === item.patientId);
                     return (
                       <tr key={item.id}>
@@ -208,43 +201,13 @@ export function DoctorAppointmentsPage({ department }: { department: Department 
               </table>
             </div>
 
-            {/* Pagination Controls */}
-            <div
-              className="table-footer"
-              style={{
-                padding: '16px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderTop: '1px solid var(--line)',
-              }}
-            >
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, rows.length)} of{' '}
-                {rows.length} appointments
-              </span>
-              <div className="button-row">
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span style={{ fontSize: 13, fontWeight: 600, padding: '0 8px' }}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </>
         ) : (
           <EmptyState

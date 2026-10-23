@@ -168,7 +168,7 @@ export function AppShell() {
           <Icon size={17} strokeWidth={1.9} /><span className="nav-label">{item.label}</span>
         </NavLink>;
       })}</nav>
-      <div className="sidebar-footer"><div className="sidebar-profile"><span className="sidebar-avatar"><UserRound size={16} /></span><div className="sidebar-footer-text"><strong>{info.name}</strong><span>{info.identity}</span></div><button type="button" className="icon-button sidebar-footer-text" aria-label="Log out" title="Log out" onClick={signOut}><LogOut size={15} /></button></div></div>
+      <div className="sidebar-footer"><div className="sidebar-profile"><span className="sidebar-avatar"><UserRound size={16} /></span><div className="sidebar-footer-text"><strong>{info.name}</strong><span>{info.identity}</span></div><button type="button" className="icon-button sidebar-logout-btn" aria-label="Log out" title="Log out" onClick={signOut}><LogOut size={15} /></button></div></div>
     </aside>
     <div className="main-column">
       <header className="topbar">

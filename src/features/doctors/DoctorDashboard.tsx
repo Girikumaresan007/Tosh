@@ -7,6 +7,7 @@ import { timeLabel } from '../../utils/format';
 import { Badge, statusTone } from '../../components/ui/Badge';
 import { Card, SectionHeading, StatCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { TablePagination, usePagination } from '../../components/ui/Pagination';
 import { PageHeading, PatientCell } from '../../components/shared/Primitives';
 
 export function DoctorDashboard({ department }: { department: Department }) {
@@ -22,6 +23,7 @@ export function DoctorDashboard({ department }: { department: Department }) {
   const deptTitle = department === 'skin' ? 'Skin & Dermatology' : 'Orthopaedics';
   const doctorName = department === 'skin' ? 'Dr. Sangamitra' : 'Dr. Sundarprakash';
   const rows = [...appointments].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const { page, setPage, pageSize, setPageSize, pagedItems: pagedRows, total } = usePagination(rows, 5);
   const cards = [
     { label: "Today's appointments", value: appointments.length, hint: 'Booked for today', icon: <CalendarDays size={16} /> },
     { label: 'Waiting patients', value: waiting, hint: 'Ready for your review', icon: <Clock3 size={16} /> },
@@ -51,7 +53,8 @@ export function DoctorDashboard({ department }: { department: Department }) {
           />
         </div>
         {rows.length ? (
-          <div className="table-wrap responsive-cards">
+          <>
+            <div className="table-wrap responsive-cards">
             <table className="data-table">
               <thead>
                 <tr>
@@ -63,7 +66,7 @@ export function DoctorDashboard({ department }: { department: Department }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((item) => {
+                {pagedRows.map((item) => {
                   const patient = state.patients.find((person) => person.id === item.patientId);
                   return (
                     <tr key={item.id}>
@@ -80,6 +83,14 @@ export function DoctorDashboard({ department }: { department: Department }) {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </>
         ) : (
           <div className="empty-state">
             <h3>No appointments scheduled</h3>

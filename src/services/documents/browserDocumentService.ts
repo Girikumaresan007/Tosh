@@ -57,19 +57,23 @@ export async function createBrowserDemoDocuments(
   return docs;
 }
 
-/** Browser-only helper for prescription images in any format. */
+/** Browser-only helper for prescription attachments (images, PDFs, documents in any format). */
 export async function createPrescriptionImage(file: File, customName?: string): Promise<PrescriptionImage> {
-  if (!isImageFile(file)) {
-    throw new Error('Please select a valid image file (JPG, PNG, WebP, GIF, BMP, AVIF, SVG, etc.).');
-  }
   if (file.size > maxSizeBytes) {
-    throw new Error('Prescription image exceeds the 25 MB limit.');
+    throw new Error('Prescription file exceeds the 25 MB limit.');
   }
   const dataUrl = await readAsDataUrl(file);
+  const mimeType = file.type || (
+    isImageFile(file)
+      ? 'image/jpeg'
+      : file.name.toLowerCase().endsWith('.pdf')
+      ? 'application/pdf'
+      : 'application/octet-stream'
+  );
   return {
-    id: `RX-IMG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `RX-FILE-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name: customName?.trim() || file.name,
-    mimeType: file.type || 'image/jpeg',
+    mimeType,
     size: file.size,
     uploadedAt: new Date().toISOString(),
     dataUrl,

@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Card, SectionHeading, StatCard } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Modal } from '../../components/ui/Modal';
+import { TablePagination, usePagination } from '../../components/ui/Pagination';
 import { useToast } from '../../components/ui/Toast';
 import type { ClinicChargeItem } from '../../services/charges/chargesService';
 import {
@@ -17,14 +18,11 @@ import {
   saveClinicCharge,
 } from '../../services/charges/chargesService';
 
-const PAGE_SIZE = 8;
-
 export function DoctorChargesPage({ department }: { department: Department }) {
   const toast = useToast();
   const [charges, setCharges] = useState<ClinicChargeItem[]>(() => getClinicCharges());
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [page, setPage] = useState(1);
 
   // Add / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,12 +49,7 @@ export function DoctorChargesPage({ department }: { department: Department }) {
     });
   }, [charges, categoryFilter, query]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage]);
+  const { page, setPage, pageSize, setPageSize, pagedItems: paginatedRows, total } = usePagination(filtered, 5);
 
   const openAddModal = () => {
     setEditingItem(null);
@@ -247,7 +240,7 @@ export function DoctorChargesPage({ department }: { department: Department }) {
                 </thead>
                 <tbody>
                   {paginatedRows.map((item, index) => {
-                    const sno = (currentPage - 1) * PAGE_SIZE + index + 1;
+                    const sno = (page - 1) * pageSize + index + 1;
                     return (
                       <tr key={item.id}>
                         <td style={{ textAlign: 'center', fontWeight: 600, color: 'var(--muted)' }}>{sno}</td>
@@ -292,43 +285,13 @@ export function DoctorChargesPage({ department }: { department: Department }) {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div
-              className="table-footer"
-              style={{
-                padding: '16px 24px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderTop: '1px solid var(--line)',
-              }}
-            >
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of{' '}
-                {filtered.length} products
-              </span>
-              <div className="button-row">
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span style={{ fontSize: 13, fontWeight: 600, padding: '0 8px' }}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="small"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </>
         ) : (
           <EmptyState
